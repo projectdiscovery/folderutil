@@ -7,7 +7,13 @@ import (
 	"strings"
 )
 
-var separator = string(os.PathSeparator)
+// Separator evaluated at runtime
+var Separator = string(os.PathSeparator)
+
+const (
+	UnixPathSeparator    = "/"
+	WindowsPathSeparator = "\\"
+)
 
 // GetFiles within a folder
 func GetFiles(root string) ([]string, error) {
@@ -45,22 +51,23 @@ func NewPathInfo(path string) (PathInfo, error) {
 		if isUnixOS() {
 			if pathInfo.RootPath == "" {
 				pathInfo.IsAbsolute = true
-				pathInfo.RootPath = "/"
+				pathInfo.RootPath = UnixPathSeparator
 			}
+		} else if isWindowsOS() {
+			pathInfo.IsAbsolute = true
+			pathInfo.RootPath = pathInfo.RootPath + WindowsPathSeparator
 		}
 	}
 
-	for _, part := range strings.Split(path, separator) {
-		if part != "" {
-			pathInfo.Parts = append(pathInfo.Parts, part)
-		}
-	}
+	pathInfo.Parts = agnosticSplit(path)
 
 	for i, pathItem := range pathInfo.Parts {
 		if i == 0 && pathInfo.IsAbsolute {
-			pathInfo.PartsWithSeparator = append(pathInfo.PartsWithSeparator, pathInfo.RootPath)
-		} else if pathInfo.PartsWithSeparator[len(pathInfo.PartsWithSeparator)-1] != separator {
-			pathInfo.PartsWithSeparator = append(pathInfo.PartsWithSeparator, separator)
+			if isUnixOS() {
+				pathInfo.PartsWithSeparator = append(pathInfo.PartsWithSeparator, pathInfo.RootPath)
+			}
+		} else if len(pathInfo.PartsWithSeparator) > 0 && pathInfo.PartsWithSeparator[len(pathInfo.PartsWithSeparator)-1] != Separator {
+			pathInfo.PartsWithSeparator = append(pathInfo.PartsWithSeparator, Separator)
 		}
 		pathInfo.PartsWithSeparator = append(pathInfo.PartsWithSeparator, pathItem)
 	}
@@ -71,9 +78,20 @@ func NewPathInfo(path string) (PathInfo, error) {
 func (pathInfo PathInfo) Paths() ([]string, error) {
 	var combos []string
 	for i := 0; i <= len(pathInfo.Parts); i++ {
-		computedPath := filepath.Join(pathInfo.Parts[:i]...)
+		var computedPath string
 		if pathInfo.IsAbsolute && pathInfo.RootPath != "" {
-			computedPath = pathInfo.RootPath + computedPath
+			// on windows we need to skip the volume, already computed in rootpath
+			if isUnixOS() {
+				computedPath = pathInfo.RootPath + filepath.Join(pathInfo.Parts[:i]...)
+			} else if isWindowsOS() && i > 0 {
+				skipItems := 0
+				if len(pathInfo.Parts) > 0 {
+					skipItems = 1
+				}
+				computedPath = pathInfo.RootPath + filepath.Join(pathInfo.Parts[skipItems:i]...)
+			}
+		} else {
+			computedPath = filepath.Join(pathInfo.Parts[:i]...)
 		}
 		combos = append(combos, filepath.Clean(computedPath))
 	}
@@ -107,4 +125,16 @@ func isUnixOS() bool {
 
 func isWindowsOS() bool {
 	return runtime.GOOS == "windows"
+}
+
+func agnosticSplit(path string) (parts []string) {
+	// split with each known separators
+	for _, part := range strings.Split(path, UnixPathSeparator) {
+		for _, subPart := range strings.Split(path, WindowsPathSeparator) {
+			if part != "" {
+				parts = append(parts, subPart)
+			}
+		}
+	}
+	return
 }
