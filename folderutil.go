@@ -48,12 +48,12 @@ func NewPathInfo(path string) (PathInfo, error) {
 	path = filepath.Clean(path)
 	pathInfo.RootPath = filepath.VolumeName(path)
 	if filepath.IsAbs(path) {
-		if isUnixOS() {
+		if IsUnixOS() {
 			if pathInfo.RootPath == "" {
 				pathInfo.IsAbsolute = true
 				pathInfo.RootPath = UnixPathSeparator
 			}
-		} else if isWindowsOS() {
+		} else if IsWindowsOS() {
 			pathInfo.IsAbsolute = true
 			pathInfo.RootPath = pathInfo.RootPath + WindowsPathSeparator
 		}
@@ -63,7 +63,7 @@ func NewPathInfo(path string) (PathInfo, error) {
 
 	for i, pathItem := range pathInfo.Parts {
 		if i == 0 && pathInfo.IsAbsolute {
-			if isUnixOS() {
+			if IsUnixOS() {
 				pathInfo.PartsWithSeparator = append(pathInfo.PartsWithSeparator, pathInfo.RootPath)
 			}
 		} else if len(pathInfo.PartsWithSeparator) > 0 && pathInfo.PartsWithSeparator[len(pathInfo.PartsWithSeparator)-1] != Separator {
@@ -81,9 +81,9 @@ func (pathInfo PathInfo) Paths() ([]string, error) {
 		var computedPath string
 		if pathInfo.IsAbsolute && pathInfo.RootPath != "" {
 			// on windows we need to skip the volume, already computed in rootpath
-			if isUnixOS() {
+			if IsUnixOS() {
 				computedPath = pathInfo.RootPath + filepath.Join(pathInfo.Parts[:i]...)
-			} else if isWindowsOS() && i > 0 {
+			} else if IsWindowsOS() && i > 0 {
 				skipItems := 0
 				if len(pathInfo.Parts) > 0 {
 					skipItems = 1
@@ -114,7 +114,7 @@ func (pathInfo PathInfo) MeshWith(anotherPath string) ([]string, error) {
 	return combos, nil
 }
 
-func isUnixOS() bool {
+func IsUnixOS() bool {
 	switch runtime.GOOS {
 	case "android", "darwin", "freebsd", "ios", "linux", "netbsd", "openbsd", "solaris":
 		return true
@@ -123,14 +123,14 @@ func isUnixOS() bool {
 	}
 }
 
-func isWindowsOS() bool {
+func IsWindowsOS() bool {
 	return runtime.GOOS == "windows"
 }
 
 func agnosticSplit(path string) (parts []string) {
 	// split with each known separators
 	for _, part := range strings.Split(path, UnixPathSeparator) {
-		for _, subPart := range strings.Split(path, WindowsPathSeparator) {
+		for _, subPart := range strings.Split(part, WindowsPathSeparator) {
 			if part != "" {
 				parts = append(parts, subPart)
 			}
