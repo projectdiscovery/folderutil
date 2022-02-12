@@ -2,6 +2,7 @@ package folderutil
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -137,4 +138,13 @@ func agnosticSplit(path string) (parts []string) {
 		}
 	}
 	return
+}
+
+// HomeDirectory
+func HomeDirOrDefault(defaultDirectory string) string {
+	usr, err := user.Current()
+	if err != nil {
+		return defaultDirectory
+	}
+	return usr.HomeDir
 }
